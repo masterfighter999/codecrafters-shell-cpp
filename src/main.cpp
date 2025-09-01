@@ -13,7 +13,8 @@ int main() {
   std::getline(std::cin, input);
   if (input == "exit 0")
     return 0;
-  std::cout << input << ": command not found" << std::endl;
+  else if (input.find("echo") != std::string::npos) std::cout << input.substr(5) << "\n";
+  else std::cout << input << ": command not found" << std::endl;
 
   main();
 }
