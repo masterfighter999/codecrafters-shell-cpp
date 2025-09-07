@@ -1,8 +1,11 @@
 #include <iostream>
 #include <string>
-#include <unistd.h>   // for access()
+#include <unistd.h>   // for access(), fork(), execv()
 #include <sstream>
 #include <cstdlib>    // for getenv
+#include <vector>
+#include <sys/wait.h> // for waitpid
+#include <cstring>    // for strerror
 
 int main()
 {
@@ -61,7 +64,81 @@ int main()
   }
   else
   {
-    std::cout << input << ": command not found" << std::endl;
+    // Attempt to run an external program with arguments.
+    // Parse input into tokens (simple whitespace split).
+    std::istringstream iss(input);
+    std::vector<std::string> tokens;
+    std::string tok;
+    while (iss >> tok)
+      tokens.push_back(tok);
+
+    if (tokens.empty())
+    {
+      std::cout << input << ": command not found" << std::endl;
+      main();
+      return 0;
+    }
+
+    std::string prog = tokens[0];
+
+    // Search PATH for executable (same as in 'type')
+    std::string fullPath;
+    const char *pathEnv = std::getenv("PATH");
+    if (pathEnv)
+    {
+      std::istringstream piss{pathEnv};
+      std::string directory;
+      while (std::getline(piss, directory, ':'))
+      {
+        if (directory.empty()) continue;
+        std::string candidate = directory + "/" + prog;
+        if (access(candidate.c_str(), X_OK) == 0)
+        {
+          fullPath = candidate;
+          break;
+        }
+      }
+    }
+
+    // If not found in PATH, try if prog itself is an executable path (relative or absolute)
+    if (fullPath.empty())
+    {
+      if (access(prog.c_str(), X_OK) == 0)
+        fullPath = prog;
+    }
+
+    if (fullPath.empty())
+    {
+      std::cout << prog << ": command not found" << std::endl;
+      main();
+      return 0;
+    }
+
+    // Build argv for execv
+    std::vector<char*> argv;
+    for (size_t i = 0; i < tokens.size(); ++i)
+      argv.push_back(const_cast<char*>(tokens[i].c_str()));
+    argv.push_back(nullptr);
+
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+      // child
+      execv(fullPath.c_str(), argv.data());
+      // if execv returns, it failed
+      std::cerr << prog << ": " << strerror(errno) << std::endl;
+      _exit(127);
+    }
+    else if (pid > 0)
+    {
+      // parent: wait for child to finish so child's output is visible to tester
+      int status = 0;
+      waitpid(pid, &status, 0);
+    }
+    else
+    {
+      std::cerr << "Fork failed" << std::endl;
+    }
   }
 
   main(); // recursion for next command
