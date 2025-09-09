@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include <unistd.h>   // for access(), fork(), execv(), getcwd()
+#include <unistd.h>   // for access(), fork(), execv(), getcwd(), chdir()
 #include <sstream>
 #include <cstdlib>    // for getenv
 #include <vector>
@@ -28,7 +28,7 @@ int main()
     std::string arg = input.substr(5);
 
     // Builtins first
-    if (arg == "echo" || arg == "exit" || arg == "type" || arg == "pwd")
+    if (arg == "echo" || arg == "exit" || arg == "type" || arg == "pwd" || arg == "cd")
     {
       std::cout << arg << " is a shell builtin\n";
     }
@@ -69,6 +69,15 @@ int main()
       std::cout << cwd << "\n";
     else
       std::cerr << "pwd: error retrieving current directory\n";
+  }
+  else if (input.substr(0, 3) == "cd ")
+  {
+    std::string path = input.substr(3);
+    if (chdir(path.c_str()) != 0)
+    {
+      std::cerr << "cd: " << path << ": No such file or directory" << std::endl;
+    }
+    // If successful, cd prints nothing
   }
   else
   {
